@@ -30,38 +30,27 @@ function curl_get($url, $header)
     return $data;
 }
 
-function getId($bduss, $fast)
+function getId($bduss)
 {
     global $m;
-    $header[] = 'Content-Type:application/x-www-form-urlencoded; charset=UTF-8';
+    $header[] = 'Content-Type:application/json; charset=UTF-8';
     $header[] = 'Cookie: BDUSS=' . $bduss;
-    if ($fast) {
-        $data = curl_get("http://tieba.baidu.com/dc/common/tbs", $header);
-        $data = getMiddle($data, '"is_login":', '}');
-        $ret = Array();
-        $ret['valid'] = $data == '1' ? '1' : '0';//bduss是否有效
+    $data = curl_get("https://tieba.baidu.com/mg/o/profile?format=json", $header);
+    $data = json_decode($data)->{"data"};
+    $ret = Array();
+
+    $ret['valid'] = $data->{"is_login"} == '1' ? '1' : '0';//bduss是否有效
+    if ($ret['valid']) {
+        $user = $data->{"user"};
+
+        $ret['name'] = $user->{"name"};
+    } else {
         $res = $m->query('Select name From ' . DB_PREFIX . 'baiduid Where bduss=\'' . $bduss . "'");
-        if ($res->num_rows != 0) {//如果该bduss在数据库里有记录
+        if ($res->num_rows == 0) {//如果在数据库中没有该bduss的相关记录
+            $ret['name'] = '无效';
+        } else {
             $row = $m->fetch_array($res);
             $ret['name'] = $row['name'];
-        } else {
-            $ret['name'] = $data == '1' ? '有效' : '无效';
-        }
-    } else {
-        $data = curl_get("http://wapp.baidu.com/", $header);
-        $name = urldecode(getMiddle($data, 'i?un=', '">'));
-        $ret = Array();
-        $ret['valid'] = $name == '' ? '0' : '1';
-        if ($ret['valid']) {
-            $ret['name'] = $name;
-        } else {
-            $res = $m->query('Select name From ' . DB_PREFIX . "baiduid Where bduss='" . $bduss . "'");
-            if ($res->num_rows == 0) {//如果在数据库中没有该bduss的相关记录
-                $ret['name'] = '无效';
-            } else {
-                $row = $m->fetch_array($res);
-                $ret['name'] = $row['name'];
-            }
         }
     }
 
@@ -72,7 +61,7 @@ if (isset($_GET["do"])) {
     switch ($_GET["do"]) {
         case 'tr':
             if (isset($_GET["bduss"]) && isset($_GET["eq"])) {
-                $id = json_decode(getId($_GET["bduss"], 0), true);
+                $id = json_decode(getId($_GET["bduss"]), true);
                 $ary['valid'] = $id['valid'];
                 $ary['name'] = $id['name'];
                 $ary['eq'] = $_GET["eq"];
@@ -80,14 +69,14 @@ if (isset($_GET["do"])) {
             }
             break;
         case 'table':
-            if (isset($_GET["uid"]) && isset($_GET["fast"])) {
+            if (isset($_GET["uid"])) {
                 //做个检测，防止恶意用户获取其他UID的BDUSS
                 if ($i['user']['role'] != "admin") {
                     $_GET["uid"] = UID;
                 }
                 $q = $m->query("Select * from " . DB_PREFIX . "baiduid where uid=" . $_GET["uid"]);
                 while ($row = $q->fetch_row()) {
-                    $ary[$row[0]] = Array(getId($row[2], $_GET["fast"]), $row[2]);
+                    $ary[$row[0]] = Array(getId($row[2]), $row[2]);
                 }
                 if (isset($ary)) {
                     echo json_encode($ary);
@@ -105,7 +94,7 @@ if (isset($_GET["do"])) {
                     echo json_encode(Array("valid" => "0", "msg" => "请不要作死，这个账号不属于你"));
                     break;
                 }
-                $id = json_decode(getId($_GET["bduss"], $_GET["fast"]), true);
+                $id = json_decode(getId($_GET["bduss"]), true);
                 if ($id['valid'] == '0') {
                     $id['msg'] = "该BDUSS无效！请检查后重新保存";
                 } else {
@@ -115,8 +104,8 @@ if (isset($_GET["do"])) {
                     } else {
                         doAction('baiduid_set');
                     }
-                    echo json_encode($id);
                 }
+                echo json_encode($id);
             }
             break;
         case 'del':

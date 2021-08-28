@@ -45,9 +45,7 @@ function tab(id){
 	$("#tab_"+id+"~.panel-body").slideToggle("fast",function(){
 		if($("#tab_"+id+" .badge").hasClass('glyphicon-chevron-down')){
 			$("#tab_"+id+" .badge").removeClass('glyphicon-chevron-down').addClass('glyphicon-chevron-up');
-			var fast=0;
-			if($("#fast").is(":checked")){ fast=1; }
-			$.get("plugins/mok_bduss/mok_bduss_bg.php",{"do":"table","uid":id,"fast":fast},function(data){
+			$.get("plugins/mok_bduss/mok_bduss_bg.php",{"do":"table","uid":id},function(data){
 				var tar=$("#tab_"+id+"~.panel-body");
 				tar.slideUp("fast",function(){
 					if(data["Empty"]){//如果该账号下没有绑定百度账号
@@ -84,9 +82,7 @@ function save(id){
 		alert("请输入有效的BDUSS");
 		btn.removeAttr("disabled").text("保存");
 	} else {
-		var fast=0;
-		if($("#fast").is(":checked")){ fast=1; }
-		$.get("plugins/mok_bduss/mok_bduss_bg.php",{"do":"save","id":id,"bduss":bduss,"fast":fast},function(data){
+		$.get("plugins/mok_bduss/mok_bduss_bg.php",{"do":"save","id":id,"bduss":bduss},function(data){
 			if(data["valid"]=="0"){
 				alert(data["msg"]);
 				btn.removeAttr("disabled").text("保存");
@@ -142,10 +138,6 @@ function tabAll(){
 </script>
 <h2>Bduss有效性检测<button type="button" class="btn btn-default pull-right" onclick="tabAll()">全部展开</button></h2>
 <div class="alert alert-info" role="alert">如果出现红字则表示该BDUSS已失效，请及时更新，否则将会断签</div>
-<div class="alert alert-info" role="alert">
-	<label><input id="fast" type="checkbox" />  启用快速检测模式</label><br/>
-	勾选该选项后可通过特殊方法检测bduss是否有效，缺点是无法显示用户名，优点是速度快。适合垃圾服务器或网速不好时使用。在v1.5版本后添加了用户名记录功能，如果你曾在普通检测模式下检测过某bduss，那么本插件将自动记录其用户名。以后你再使用快速检测时，就也可以像普通模式一样显示用户名了。
-</div>
 <div id="mok_me" class="panel panel-primary">
 	<div class="panel-heading"><?php echo NAME; ?></div>
 	<div class="panel-body">
