@@ -1,13 +1,13 @@
 <?php
 /*
 Plugin Name: BDUSS有效性检测
-Version: 1.6
+Version: 1.7
 Plugin URL: http://www.longtings.com
 Description: 检测BDUSS是否有效
 Author: mokeyjay
 Author Email: longting@longtings.com
 Author URL: http://www.longtings.com
-For: V3.0+
+For: V4.94+
 */
 if (!defined('SYSTEM_ROOT')) { die('Insufficient Permissions'); }
 
