@@ -33,19 +33,13 @@ function curl_get($url, $header)
 function getId($bduss)
 {
     global $m;
-    $header[] = 'Content-Type:application/json; charset=UTF-8';
-    $header[] = 'Cookie: BDUSS=' . $bduss;
-    $data = curl_get("https://tieba.baidu.com/mg/o/profile?format=json", $header);
-    $data = json_decode($data)->{"data"};
-    $ret = Array();
-
-    $ret['valid'] = $data->{"is_login"} == '1' ? '1' : '0';//bduss是否有效
+    $data = getBaiduUserInfo($bduss);
+    $ret = [];
+    $ret['valid'] = (isset($data["portrait"]) && $data["portrait"] == '') ? '0' : '1';
     if ($ret['valid']) {
-        $user = $data->{"user"};
-
-        $ret['name'] = $user->{"name"};
+        $ret['name'] = $data["name"];
     } else {
-        $res = $m->query('Select name From ' . DB_PREFIX . 'baiduid Where bduss=\'' . $bduss . "'");
+        $res = $m->query('Select name From ' . DB_PREFIX . "baiduid Where bduss='" . $m->escape_string($bduss) . "'");
         if ($res->num_rows == 0) {//如果在数据库中没有该bduss的相关记录
             $ret['name'] = '无效';
         } else {
@@ -74,7 +68,7 @@ if (isset($_GET["do"])) {
                 if ($i['user']['role'] != "admin") {
                     $_GET["uid"] = UID;
                 }
-                $q = $m->query("Select * from " . DB_PREFIX . "baiduid where uid=" . $_GET["uid"]);
+                $q = $m->query("Select * from " . DB_PREFIX . "baiduid where uid=" . $m->escape_string($_GET["uid"]));
                 while ($row = $q->fetch_row()) {
                     $ary[$row[0]] = Array(getId($row[2]), $row[2]);
                 }
@@ -88,7 +82,7 @@ if (isset($_GET["do"])) {
         case 'save':
             if (isset($_GET["id"]) && isset($_GET["bduss"])) {
                 //做个检测，防止恶意用户修改其他ID的BDUSS
-                $m->query("Select * From " . DB_PREFIX . "baiduid Where uid=" . UID . " and id=" . $_GET["id"]);
+                $m->query("Select * From " . DB_PREFIX . "baiduid Where uid=" . UID . " and id=" . $m->escape_string($_GET["id"]));
                 //判断当前用户ID（UID）下是否有将要修改的这个账号ID，如果没有（就是说这id并没有绑定在这个UID下）并且当前用户不是管理员的话
                 if ($m->affected_rows() == 0 && $i['user']['role'] != "admin") {
                     echo json_encode(Array("valid" => "0", "msg" => "请不要作死，这个账号不属于你"));
@@ -98,11 +92,12 @@ if (isset($_GET["do"])) {
                 if ($id['valid'] == '0') {
                     $id['msg'] = "该BDUSS无效！请检查后重新保存";
                 } else {
-                    if ($m->query('Update ' . DB_PREFIX . 'baiduid Set bduss="' . $_GET["bduss"] . '",name="' . $id['name'] . '" Where id=' . $_GET["id"]) === false) {
+                    if ($m->query('Update ' . DB_PREFIX . 'baiduid Set bduss="' . $m->escape_string($_GET["bduss"]) . '",name="' . $m->escape_string($id['name']) . '" Where id=' . $m->escape_string($_GET["id"])) === false) {
                         $id['valid'] = '0';
                         $id['msg'] = "数据库错误，保存失败";
                     } else {
-                        doAction('baiduid_set');
+                        $id['valid'] = '1';
+                        $id['msg'] = "保存成功";
                     }
                 }
                 echo json_encode($id);
@@ -111,18 +106,18 @@ if (isset($_GET["do"])) {
         case 'del':
             if (isset($_GET["id"])) {
                 //做个检测，防止恶意用户删除其他ID的账号
-                $m->query("Select * From " . DB_PREFIX . "baiduid Where uid=" . UID . " and id=" . $_GET["id"]);
+                $m->query("Select * From " . DB_PREFIX . "baiduid Where uid=" . UID . " and id=" . $m->escape_string($_GET["id"]));
                 //判断当前用户ID（UID）下是否有将要修改的这个账号ID，如果没有（就是说这id并没有绑定在这个UID下）并且当前用户不是管理员的话
                 if ($m->affected_rows() == 0 && $i['user']['role'] != "admin") {
                     echo json_encode(Array("status" => "false", "msg" => "请不要作死，这个账号不属于你"));
                     break;
                 }
                 //查询该用户所在分表
-                $res = $m->query('SELECT t FROM ' . DB_PREFIX . 'users,' . DB_PREFIX . 'baiduid WHERE ' . DB_PREFIX . 'baiduid.id=' . $_GET["id"]);
+                $res = $m->query('SELECT t FROM ' . DB_PREFIX . 'users,' . DB_PREFIX . 'baiduid WHERE ' . DB_PREFIX . 'baiduid.id=' . $m->escape_string($_GET["id"]));
                 if ($m->affected_rows() != 0) {
                     $res = $res->fetch_array();
-                    if ($m->query('Delete From ' . DB_PREFIX . 'baiduid Where id=' . $_GET["id"]) &&
-                        $m->query('Delete From ' . DB_PREFIX . $res['t'] . ' Where pid=' . $_GET["id"])
+                    if ($m->query('Delete From ' . DB_PREFIX . 'baiduid Where id=' . $m->escape_string($_GET["id"])) &&
+                        $m->query('Delete From ' . DB_PREFIX . $res['t'] . ' Where pid=' . $m->escape_string($_GET["id"]))
                     ) {
                         $ary["status"] = "true";
                     } else {
@@ -142,9 +137,9 @@ if (isset($_GET["do"])) {
                     echo json_encode(Array("status" => "false", "msg" => "请不要作死，这个账号不属于你"));
                     break;
                 }
-                if ($m->query('Delete From ' . DB_PREFIX . 'users Where id=' . $_GET["uid"])) {
+                if ($m->query('Delete From ' . DB_PREFIX . 'users Where id=' . $m->escape_string($_GET["uid"]))) {
                     if (SYSTEM_VER >= 3.4) {
-                        $m->query('Delete From ' . DB_PREFIX . 'users_options Where uid=' . $_GET["uid"]);
+                        $m->query('Delete From ' . DB_PREFIX . 'users_options Where uid=' . $m->escape_string($_GET["uid"]));
                     }
                     $ary["status"] = "true";
                 } else {
@@ -156,7 +151,7 @@ if (isset($_GET["do"])) {
             break;
         case 'mail':
             if (isset($_GET["id"])) {
-                $ret = $m->once_fetch_array('Select email From ' . DB_PREFIX . 'users Where id=' . $_GET["id"]);
+                $ret = $m->once_fetch_array('Select email From ' . DB_PREFIX . 'users Where id=' . $m->escape_string($_GET["id"]));
                 if (isset($ret['email']) && $ret['email'] != '') {
                     $x = misc::mail($ret['email'], '你在云签中绑定的百度帐号过期了 - 来自BDUSS有效性检测插件', '你在' . SYSTEM_URL . '云签中绑定的百度帐号过期了，这将导致无法继续签到，请登录并重新绑定');
                     if ($x === true) {
